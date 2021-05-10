@@ -11,8 +11,8 @@ class LasinkSimulation(Dataset):
     def __init__(self, folder, transform=None):
         self.transforms=transform
 
-        self.imgs = glob.glob(folder+'/original/*')
-        self.matrix = glob.glob(folder+'/matrix/*')
+        self.imgs = glob.glob(folder+'/original/*')*10
+        self.matrix = glob.glob(folder+'/matrix/*')*10
             
 
     def __getitem__(self, index):
