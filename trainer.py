@@ -11,7 +11,7 @@ import numpy as np
 import pandas as pd
 from pathlib import Path
 from torch.optim.lr_scheduler import OneCycleLR
-
+from torch.optim.lr_scheduler import OneCycleLR, CosineAnnealingLR, MultiplicativeLR
 import random
 
 from torch import optim
@@ -167,7 +167,7 @@ class Trainer:
         # Forward
         out = self.model(x)
         # Loss computation
-        return 1-self.criterion(out, target)
+        return self.criterion(out, target)
 
     def _set_params(self):
         self._params = ContiguousParams([p for p in self.model.parameters() if p.requires_grad])
@@ -391,7 +391,7 @@ class ClassificationTrainer(Trainer):
             # Forward
             out = self.model(x)
             # Loss computation
-            loss_val = 1- self.criterion(out, target).item()
+            loss_val = self.criterion(out, target).item()
 
 
             num_samples += x.shape[0]
