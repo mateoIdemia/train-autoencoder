@@ -127,32 +127,20 @@ class CAE(nn.Module):
             nn.Tanh()
         )
 
-        for m in self.modules():
-            if isinstance(m, nn.Conv2d):
-                nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
-            elif isinstance(m, (nn.BatchNorm2d, nn.GroupNorm)):
-                nn.init.constant_(m.weight, 1)
-                nn.init.constant_(m.bias, 0)
-
     def forward(self, x):
         ec1 = self.e_conv_1(x)
         ec2 = self.e_conv_2(ec1)
         eblock1 = self.e_block_1(ec2) + ec2
         eblock2 = self.e_block_2(eblock1) + eblock1
         eblock3 = self.e_block_3(eblock2) + eblock2
-        ec3 = self.e_conv_3(eblock3)  # in [-1, 1] from tanh activation
-
-
-
-        # encoded tensor
-        self.encoded = ec3
+        self.encoded = self.e_conv_3(eblock3)  # in [-1, 1] from tanh activation
 
         return self.decode(self.encoded)
 
     def decode(self, encoded):
-        y = encoded  # (0|1) -> (-1|1)
+  
 
-        uc1 = self.d_up_conv_1(y)
+        uc1 = self.d_up_conv_1(encoded)
         dblock1 = self.d_block_1(uc1) + uc1
         dblock2 = self.d_block_2(dblock1) + dblock1
         dblock3 = self.d_block_3(dblock2) + dblock2

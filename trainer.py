@@ -391,7 +391,7 @@ class ClassificationTrainer(Trainer):
             # Forward
             out = self.model(x)
             # Loss computation
-            loss_val = self.criterion(out, target).item()
+            loss_val += self.criterion(out, target).item()
 
 
             num_samples += x.shape[0]
