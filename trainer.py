@@ -235,7 +235,7 @@ class Trainer:
        
             self.save(self.output_file)
 
-  def lr_find(self, freeze_until=None, start_lr=1e-7, end_lr=1, num_it=100):
+    def lr_find(self, freeze_until=None, start_lr=1e-7, end_lr=1, num_it=100):
         """
         Gridsearch the optimal learning rate for the training
 
