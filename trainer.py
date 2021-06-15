@@ -13,7 +13,7 @@ from pathlib import Path
 from torch.optim.lr_scheduler import OneCycleLR
 from torch.optim.lr_scheduler import OneCycleLR, CosineAnnealingLR, MultiplicativeLR
 import random
-
+import wandb
 from torch import optim
 import torchvision
 
@@ -167,7 +167,7 @@ class Trainer:
         # Forward
         out = self.model(x)
         # Loss computation
-        return self.criterion(out, target)
+        return 1-self.criterion(out, target)
 
     def _set_params(self):
         self._params = ContiguousParams([p for p in self.model.parameters() if p.requires_grad])
@@ -235,132 +235,9 @@ class Trainer:
        
             self.save(self.output_file)
 
-    def lr_find(self, freeze_until=None, start_lr=1e-7, end_lr=1, num_it=100):
-        """
-        Gridsearch the optimal learning rate for the training
-        Args:
-           freeze_until (str, optional): last layer to freeze
-           start_lr (float, optional): initial learning rate
-           end_lr (float, optional): final learning rate
-           num_it (int, optional): number of iterations to perform
-        """
-        if len(self.train_loader) < num_it:
-            print("Can't reach", num_it, "iterations, num_it is now", len(self.train_loader))
-            num_it = len(self.train_loader)
-
-        self.model = freeze_model(self.model.train(), freeze_until)
-        # Update param groups & LR
-        self._reset_opt(start_lr)
-        gamma = (end_lr / start_lr) ** (1 / (num_it - 1))
-        scheduler = MultiplicativeLR(self.optimizer, lambda step: gamma)
-
-        self.lr_recorder = [start_lr * gamma ** idx for idx in range(num_it)]
-        self.loss_recorder = []
-
-        for batch_idx, (x, target) in enumerate(self.train_loader):
-            x, target = self.to_cuda(x, target)
-
-            # Forward
-            batch_loss = self._get_loss(x, target)
-            self._backprop_step(batch_loss)
-            # Update LR
-            scheduler.step()
-
-            # Record
-            self.loss_recorder.append(batch_loss.item())
-            # Stop after the number of iterations
-            if batch_idx + 1 == num_it:
-                break
-
-    def showBatch(self, nb_images=None, nrow=4, fig_size_X=15, fig_size_Y=15, normalize=True):
-
-        x, target = next(iter(self.train_loader))
-
-        if(nb_images):
-            x = x[:nb_images, :, :, :]
-            target = target[:nb_images]
-
-        images = make_grid(x, nrow=nrow)  # the default nrow is 8
-
-        # Inverse normalize the images
-        inv_normalize = transforms.Normalize(
-            mean=[-0.485 / 0.229, -0.456 / 0.224, -0.406 / 0.225],
-            std=[1 / 0.229, 1 / 0.224, 1 / 0.225]
-        )
-        if normalize:
-            im_inv = inv_normalize(images)
-        else:
-            im_inv = images
-
-        # Print the images
-        plt.figure(figsize=(fig_size_X, fig_size_Y))
-        plt.imshow(np.transpose(im_inv.numpy(), (1, 2, 0)))
-
-    def plot_recorder(self, beta=0.95, block=True):
-        """
-        Display the results of the LR grid search
-        Args:
-            beta (float, optional): smoothing factor
-            block (bool, optional): whether the plot should block execution
-        """
-        if len(self.lr_recorder) != len(self.loss_recorder) or len(self.lr_recorder) == 0:
-            raise AssertionError("Please run the `lr_find` method first")
-
-        # Exp moving average of loss
-        smoothed_losses = []
-        avg_loss = 0
-        for idx, loss in enumerate(self.loss_recorder):
-            avg_loss = beta * avg_loss + (1 - beta) * loss
-            smoothed_losses.append(avg_loss / (1 - beta ** (idx + 1)))
-
-        plt.plot(self.lr_recorder[10:-5], smoothed_losses[10:-5])
-        plt.xscale('log')
-        plt.xlabel('Learning Rate')
-        plt.ylabel('Training loss')
-        plt.grid(True, linestyle='--', axis='x')
-        plt.show(block=block)
-
-    def plot_losses(self):
-
-        plt.plot(self.val_loss_recorder, label='val loss')
-        plt.plot(self.train_loss_recorder, label='train loss')
-        plt.xlabel('Epoch')
-        plt.ylabel('Loss')
-        plt.legend(loc='lower right')
-        plt.show()
-
-    def check_setup(self, freeze_until=None, lr=3e-4, num_it=100):
-        """
-        Check whether you can overfit one batch
-        Args:
-            freeze_until (str, optional): last layer to freeze
-            lr (float, optional): learning rate to be used for training
-            num_it (int, optional): number of iterations to perform
-        """
-        self.model = freeze_model(self.model.train(), freeze_until)
-        # Update param groups & LR
-        self._reset_opt(lr)
-
-        prev_loss = math.inf
-
-        x, target = next(iter(self.train_loader))
-        x, target = self.to_cuda(x, target)
-
-        for _ in range(num_it):
-            # Forward
-            batch_loss = self._get_loss(x, target)
-            # Backprop
-            self._backprop_step(batch_loss)
-
-            # Check that loss decreases
-            if batch_loss.item() > prev_loss:
-                return False
-            prev_loss = batch_loss.item()
-
-        return True
 
 
-class ClassificationTrainer(Trainer):
+class AutoencoderTrainer(Trainer):
 
     """
     Image classification trainer class
@@ -391,7 +268,7 @@ class ClassificationTrainer(Trainer):
             # Forward
             out = self.model(x)
             # Loss computation
-            loss_val += self.criterion(out, target).item()
+            loss_val += 1-self.criterion(out, target).item()
 
 
             num_samples += x.shape[0]
@@ -407,8 +284,10 @@ class ClassificationTrainer(Trainer):
         )
         tp = transforms.ToPILImage()
 
-        res = tp(inv_normalize(out[0,:,:,:]))
-        res.save(str(self.epoch).zfill(4) + '.jpg')
+        res = tp(torch.clip(inv_normalize(out[0,:,:,:]), 0, 1))
+        res.save('res_' + str(self.epoch).zfill(4) + '.jpg')
+        tar = tp(torch.clip(inv_normalize(target[0,:,:,:]), 0, 1))
+        tar.save('tar_' + str(self.epoch).zfill(4) + '.jpg')
 
 
 
