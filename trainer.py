@@ -284,6 +284,31 @@ class Trainer:
             if batch_idx + 1 == num_it:
                 break
 
+    def plot_recorder(self, beta=0.95, block=True):
+        """
+        Display the results of the LR grid search
+
+        Args:
+            beta (float, optional): smoothing factor
+            block (bool, optional): whether the plot should block execution
+        """
+        if len(self.lr_recorder) != len(self.loss_recorder) or len(self.lr_recorder) == 0:
+            raise AssertionError("Please run the `lr_find` method first")
+
+        # Exp moving average of loss
+        smoothed_losses = []
+        avg_loss = 0
+        for idx, loss in enumerate(self.loss_recorder):
+            avg_loss = beta * avg_loss + (1 - beta) * loss
+            smoothed_losses.append(avg_loss / (1 - beta ** (idx + 1)))
+
+        plt.plot(self.lr_recorder[10:-5], smoothed_losses[10:-5])
+        plt.xscale('log')
+        plt.xlabel('Learning Rate')
+        plt.ylabel('Training loss')
+        plt.grid(True, linestyle='--', axis='x')
+        plt.show(block=block)
+
 
 class AutoencoderTrainer(Trainer):
 
