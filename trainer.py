@@ -235,6 +235,54 @@ class Trainer:
        
             self.save(self.output_file)
 
+  def lr_find(self, freeze_until=None, start_lr=1e-7, end_lr=1, num_it=100):
+        """
+        Gridsearch the optimal learning rate for the training
+
+        Args:
+           freeze_until (str, optional): last layer to freeze
+           start_lr (float, optional): initial learning rate
+           end_lr (float, optional): final learning rate
+           num_it (int, optional): number of iterations to perform
+        """
+        if len(self.train_loader) < num_it:
+            print("Can't reach", num_it, "iterations, num_it is now", len(self.train_loader))
+            num_it = len(self.train_loader)
+
+        self.model = freeze_model(self.model.train(), freeze_until)
+        # Update param groups & LR
+        self._reset_opt(start_lr)
+        gamma = (end_lr / start_lr) ** (1 / (num_it - 1))
+        scheduler = MultiplicativeLR(self.optimizer, lambda step: gamma)
+
+        self.lr_recorder = [start_lr * gamma ** idx for idx in range(num_it)]
+        self.loss_recorder = []
+
+        for batch_idx, (x, target) in enumerate(self.train_loader):
+            x, target = self.to_cuda(x, target)
+
+            y = self.model(x)
+     
+            batch_loss = -(1-self.criterion(x, y))
+            self.train_loss -= batch_loss.item()
+
+            self.optimizer.zero_grad()
+            # Backpropate the loss
+            batch_loss.backward()
+            # Update the params
+            self.optimizer.step()
+
+            # # Backprop
+            # self._backprop_step(batch_loss)
+            # # Update LR
+           
+            scheduler.step()
+
+            # Record
+            self.loss_recorder.append(batch_loss.item())
+            # Stop after the number of iterations
+            if batch_idx + 1 == num_it:
+                break
 
 
 class AutoencoderTrainer(Trainer):
