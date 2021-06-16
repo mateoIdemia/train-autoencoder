@@ -9,9 +9,21 @@ from cae_32x32x32 import CAE
 import holocron
 from trainer import AutoencoderTrainer
 from ssim import SSIM
-
+import math
 from lasink_simulation_dataset import LasinkSimulation
 from typing import Optional, Dict
+from dncnn import DnCNN
+
+def weights_init_kaiming(m):
+    classname = m.__class__.__name__
+    if classname.find('Conv') != -1:
+        nn.init.kaiming_normal_(m.weight.data, a=0, mode='fan_in')
+    elif classname.find('Linear') != -1:
+        nn.init.kaiming_normal_(m.weight.data, a=0, mode='fan_in')
+    elif classname.find('BatchNorm') != -1:
+        # nn.init.uniform(m.weight.data, 1.0, 0.02)
+        m.weight.data.normal_(mean=0, std=math.sqrt(2./9./64.)).clamp_(-0.025,0.025)
+        nn.init.constant_(m.bias.data, 0.0)
 
 
 def build_dataset(config):
@@ -46,7 +58,8 @@ def train(config=None):
         config = wandb.config
 
         train_loader, val_loader = build_dataset(config)
-        model = CAE()
+        model = DnCNN(channels=3)
+        model.apply(weights_init_kaiming)
         lr = config['lr']
         wd = config['wd']
 
