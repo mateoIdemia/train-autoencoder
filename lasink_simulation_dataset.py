@@ -23,13 +23,13 @@ class LasinkSimulation(Dataset):
         img = Image.open(self.imgs[index])
 
         img = self.transforms(img)
-        lasink = gen_fake_lasink(img, 1, 2)
+        #lasink = gen_fake_lasink(img, 1, 2)
 
         img = self.transforms_tensor(img)
-        lasink = self.transforms_tensor(lasink)
+        #lasink = self.transforms_tensor(lasink)
 
 
-        return img,  lasink
+        return img,  img
 
     def __len__(self):
         return len(self.imgs)
